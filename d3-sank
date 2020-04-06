@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<!--
+Copyright 2018 SAS Institute Inc.
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+    https://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<!--
+	Bar Chart original code based on:
+	https://bost.ocks.org/mike/bar/3/
+	http://animateddata.co.uk/articles/d3/responsive/
+	
+	This example implements some basic chart functionality/characteristics, such as:
+	1. Default visualization (template/placeholder chart)
+	2. Roles validation
+	3. Formats
+	4. Selection (including multiple selections via crtl key)
+	5. Window resizing
+-->
+<html>
+<head>
+	<meta charset="utf-8">
+	<script src="https://d3js.org/d3.v4.min.js"></script>
+    <script type="text/javascript" src="../util/messagingUtil.js"></script>
+    <script type="text/javascript" src="../util/contentUtil.js"></script>
+    <script type="text/javascript" src="../thirdPartyHelpers/d3.js"></script>
+</head>
+<body>
+<style>
+
+.link {
+  fill: none;
+  stroke: #000;
+  stroke-opacity: .2;
+}
+.link:hover {
+  stroke-opacity: .5;
+}
+
+</style>
+
+<div id="chart"></div>
+
+<script>
+
+	// set the dimensions and margins of the graph
+var margin = {top: 10, right: 10, bottom: 10, left: 10},
+    width = 450 - margin.left - margin.right,
+    height = 480 - margin.top - margin.bottom;
+
+// append the svg object to the body of the page
+var svg = d3.select("#my_dataviz").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+  .append("g")
+    .attr("transform",
+          "translate(" + margin.left + "," + margin.top + ")");
+// Color scale used
+var color = d3.scaleOrdinal(d3.schemeCategory20);
+
+// Set the sankey diagram properties
+var sankey = d3.sankey()
+    .nodeWidth(36)
+    .nodePadding(290)
+    .size([width, height]);
+
+// load the data
+d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/data_sankey.json", function(error, graph) {
+
+  // Constructs a new Sankey generator with the default settings.
+  sankey
+      .nodes(graph.nodes)
+      .links(graph.links)
+      .layout(1);
+
+  // add in the links
+  var link = svg.append("g")
+    .selectAll(".link")
+    .data(graph.links)
+    .enter()
+    .append("path")
+      .attr("class", "link")
+      .attr("d", sankey.link() )
+      .style("stroke-width", function(d) { return Math.max(1, d.dy); })
+      .sort(function(a, b) { return b.dy - a.dy; });
+
+  // add in the nodes
+  var node = svg.append("g")
+    .selectAll(".node")
+    .data(graph.nodes)
+    .enter().append("g")
+      .attr("class", "node")
+      .attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; })
+      .call(d3.drag()
+        .subject(function(d) { return d; })
+        .on("start", function() { this.parentNode.appendChild(this); })
+        .on("drag", dragmove));
+
+  // add the rectangles for the nodes
+  node
+    .append("rect")
+      .attr("height", function(d) { return d.dy; })
+      .attr("width", sankey.nodeWidth())
+      .style("fill", function(d) { return d.color = color(d.name.replace(/ .*/, "")); })
+      .style("stroke", function(d) { return d3.rgb(d.color).darker(2); })
+    // Add hover text
+    .append("title")
+      .text(function(d) { return d.name + "\n" + "There is " + d.value + " stuff in this node"; });
+
+  // add in the title for the nodes
+    node
+      .append("text")
+        .attr("x", -6)
+        .attr("y", function(d) { return d.dy / 2; })
+        .attr("dy", ".35em")
+        .attr("text-anchor", "end")
+        .attr("transform", null)
+        .text(function(d) { return d.name; })
+      .filter(function(d) { return d.x < width / 2; })
+        .attr("x", 6 + sankey.nodeWidth())
+        .attr("text-anchor", "start");
+
+  // the function for moving the nodes
+  function dragmove(d) {
+    d3.select(this)
+      .attr("transform",
+            "translate("
+               + d.x + ","
+               + (d.y = Math.max(
+                  0, Math.min(height - d.dy, d3.event.y))
+                 ) + ")");
+    sankey.relayout();
+    link.attr("d", sankey.link() );
+  }
+
+		
+		
+        function onDataReceived(messageFromVA)
+        {
+			_resultData = messageFromVA;
+			_resultName = messageFromVA.resultName;
+			_selections = va.contentUtil.initializeSelections(messageFromVA);
+			if (!va.contentUtil.validateRoles(messageFromVA, ["string","number"], null)) {
+				va.messagingUtil.postInstructionalMessage(_resultName, 
+					"D3 Bar Chart expects columns to be assigned in this order:\n" +
+					" 1. X axis (string)\n" +
+					" 2. Y axis (number)");
+				return;
+			}
+			_data = messageFromVA.data;
+			// Numeric values can be assigned to the tooltip, so we should format the data
+			_axisFormatter = va.d3Helper.configureAxisFormatter(messageFromVA);
+			updateChart();
+        }
+
+		//
+		// Event handlers for interactions with the Bar Chart
+		//
+		
+		// Called when clicked on the chart background
+		//
+		function deselectAllBars(d, i) {
+			d3.selectAll("rect.bar-selected").classed("bar-selected", false);
+			va.messagingUtil.postSelectionMessage(_resultName, []);
+		}
+			
+			
+		// Called when clicked on a bar
+		//
+		function selectBar(d,i,clickedBar){
+			d3.event.stopPropagation();
+			
+			var bars = d3.selectAll("rect.bar");
+			var selectedFlag = d3.select(clickedBar).classed("bar-selected");
+
+			if (d3.event.ctrlKey) {
+				// Change selection status of selected bar and leave others unchanged
+				d3.select(clickedBar).classed("bar-selected", !selectedFlag);
+			}
+			else {
+				// Clear all selections
+				bars.classed("bar-selected", false);
+				d3.select(clickedBar).classed("bar-selected", !selectedFlag);
+			}
+			
+			// Send selections back to VA
+			var selections = [];
+			d3.selectAll("rect.bar").each(function(d,i){
+				if (d3.select(this).classed("bar-selected")) {
+					selections.push({row: i});
+				}
+			});
+			va.messagingUtil.postSelectionMessage(_resultName, selections);
+		}
+
+		
+		va.messagingUtil.setOnDataReceivedCallback(onDataReceived);
+		initChart();
+		updateChart();
+	
+</script>
+</body>
+</html>
