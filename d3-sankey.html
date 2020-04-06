@@ -41,7 +41,6 @@ var svg = d3.select("#my_dataviz").append("svg")
   .append("g")
     .attr("transform",
           "translate(" + margin.left + "," + margin.top + ")");
-
 // Color scale used
 var color = d3.scaleOrdinal(d3.schemeCategory20);
 
@@ -52,7 +51,7 @@ var sankey = d3.sankey()
     .size([width, height]);
 
 // load the data
-d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/data_sankey.json", function(error, graph) {
+d3.json("https://fla5h1209.github.io/acct.json", function(error, graph) {
 
   // Constructs a new Sankey generator with the default settings.
   sankey
