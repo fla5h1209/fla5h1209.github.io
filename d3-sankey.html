@@ -51,7 +51,7 @@ var sankey = d3.sankey()
     .size([width, height]);
 
 // load the data
-d3.json("https://fla5h1209.github.io/acct.json", function(error, graph) {
+d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/data_sankey.json", function(error, graph) {
 
   // Constructs a new Sankey generator with the default settings.
   sankey
